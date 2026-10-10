@@ -28,3 +28,25 @@ lives in `star-charter`; this repo starts fresh with a pointer back.
 
 **Consequence.** Trivial to host/share; nothing to install. Splitting into modules is deferred
 until it actually hurts.
+
+---
+
+## 0003 — Standard modules as script files; supersedes 0002's single file
+**Status:** Accepted (2026-10-10, owner: game-standards retrofit, all nine Cabinet games)
+
+**Context.** The game-systems law (`AI-Brain\instructions\game-systems-law.md`, GAME-17 to GAME-19)
+binds every game. The reference modules live once in `reference\game-std`; a game copies them into
+`src/std/`. Inlining them into `index.html` would be a second copy that drifts from the reference.
+
+**Decision.** `index.html` stays the shell and the game; `src/std/` holds the copied modules;
+`config/game.json` holds the keys, the step cap and the intent map, with `config/game.js` generated
+from it by `tools/build-config.mjs` so the game still opens from disk with no fetch. The watchdog is
+the first script. Zero dependencies stays true.
+
+**Consequence.** No existing save, best score or setting is lost: the save key `echoBatSave` and the
+settings key `echo-bat.settings` keep their names; the unversioned save is read as version 0 and
+migrated in place. Slices: (1) watchdog, config, save; (2) tick; (3) intents. Gate for each: the game
+runs from disk, the old save loads, the owner play-tests. The monorepo copy is refreshed at the end.
+
+**Change log.**
+- 2026-10-10: slice 1 built: watchdog first, config twin, the standard save with the version-0 migration, the dev menu on the colophon. Proven live: a seeded unversioned save loaded with best 41, level 7, muted; the next write carried version 1; 3 Node tests; zero errors in the log.

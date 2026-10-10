@@ -29,6 +29,13 @@
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* the dev menu (OBS-08), mounted by src/std/watchdog.js; this game's own tokens */
+.gs-dev { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg); color: var(--ink); }
+.gs-dev-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted); }
+.gs-dev-log { flex: 1; min-height: 0; margin: 0; padding: 8px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); font: 0.68rem/1.4 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gs-dev-bar { display: flex; gap: 8px; }
+.gs-dev-btn { flex: 1; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel); color: var(--ink); font: inherit; }
+button.colophon { background: none; border: 0; font: inherit; cursor: pointer; }
 html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   background: var(--bg);
@@ -256,7 +263,7 @@ body {
     <br>
     <button id="btnSettingsT" class="btn-ghost">Sound &amp; settings</button>
     <p class="record-line" id="recordLine" hidden>Best harvest <b id="recordVal">0</b></p>
-    <p class="colophon">N°03 ✦ The Glass Archive ✦ MMXXVI</p>
+    <button class="colophon" id="colophon" type="button" aria-label="Colophon. Tap five times for the debug log.">N°03 ✦ The Glass Archive ✦ MMXXVI</button>
     <nav class="archive-nav" aria-label="other games in the archive">
       <a href="../star-charter/">N°01 ✦ Star Charter</a>
       <a href="../star-charter-pro/">N°02 ✦ Star Charter Pro</a>
@@ -312,6 +319,16 @@ body {
   </section>
 </div>
 
+<!-- Script order is the law of this page (game-systems law, OBS-09): plain scripts, globals, no modules,
+     no fetch; the game opens from disk. config/game.js is generated from config/game.json. -->
+<script src="config/game.js"></script>
+<script src="src/std/watchdog.js"></script>
+<script>
+  // OBS-09: the watchdog is installed before any other game script runs.
+  window.WATCHDOG = GameStd.createWatchdog({ key: GAME_CONFIG.log.key, ringSize: GAME_CONFIG.log.ringSize, flushMs: GAME_CONFIG.log.flushMs, version: GAME_CONFIG.meta.version }).install();
+</script>
+<script src="src/std/save.js"></script>
+<script src="src/save-migrations.js"></script>
 <script>
 (() => {
 'use strict';
@@ -351,20 +368,24 @@ const caveName = (l) => CAVES[(l - 1) % CAVES.length];
 // ==========================================================================
 // SAVE
 // ==========================================================================
-const SAVE_KEY = 'echoBatSave';
-let save = { best: 0, bestLevel: 0, muted: false };
-try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch (e) {}
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+// GAME-17: the standard save module. Same key as the shipped game; the unversioned save is read
+// as version 0 and migrated in place (src/save-migrations.js). A refused write is reported, never hidden.
+const CFG = window.GAME_CONFIG;
+const SAVE = GameStd.createSave({
+  key: CFG.save.key, settingsKey: CFG.save.settingsKey, version: CFG.save.version,
+  defaults: { best: 0, bestLevel: 0, muted: false, waits: {} }, settingsDefaults: { sfx: true, music: true },
+  migrations: window.EB_MIGRATIONS, report: WATCHDOG.report
+});
+const save = SAVE.data;
+function persist() { if (!SAVE.write()) WATCHDOG.log.write('WARN', 'save_not_written', { best: save.best }); }
 
 // ==========================================================================
 // SETTINGS — sound toggles under their own key; the save above is never
 // touched or reformatted by these. Both default ON. The HUD mute button
 // stays what it always was: a master mute on top of these.
 // ==========================================================================
-const SETTINGS_KEY = 'echo-bat.settings';
-const settings = { sfx: true, music: true };
-try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) {}
-function persistSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+const settings = SAVE.settings;
+function persistSettings() { SAVE.writeSettings(); }
 
 // ==========================================================================
 // AUDIO — generated, no files
@@ -1514,6 +1535,7 @@ window.__eb = {
   hit: () => tryHit(bat.x + 10, bat.y),
 };
 
+WATCHDOG.mountDevMenu({ target: $('colophon'), taps: CFG.log.devMenuTaps, lines: CFG.log.devMenuLines, exportName: CFG.log.exportName });
 resize();
 toTitle();
 raf = requestAnimationFrame(frame);

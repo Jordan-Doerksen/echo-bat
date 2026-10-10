@@ -1,0 +1,12 @@
+{
+  "name": "echo-bat",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Echo Bat: a bat in the dark, harvesting glowing fruit by sonar. Opens from disk. No build tools, no dependencies.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node tools/build-config.mjs",
+    "gate": "node tools/build-config.mjs --check",
+    "test": "npm run gate && node --test tests/save.test.mjs"
+  }
+}

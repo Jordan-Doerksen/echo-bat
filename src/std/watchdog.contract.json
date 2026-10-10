@@ -1,0 +1,20 @@
+{
+  "_rule": "The one contract two watchdogs implement: std/watchdog.js here (plain script, file:// safe) and src/watchdog/ in games/starfall (TypeScript). Both test suites read this file. A change here is a Change Request in both repos. OBS-02 keys, OpenTelemetry severity numbers, the event names a log reader may rely on.",
+  "version": 1,
+  "keys": ["ts", "level", "severity_number", "run_id", "event", "ctx"],
+  "severity": { "TRACE": 1, "DEBUG": 5, "INFO": 9, "WARN": 13, "ERROR": 17, "FATAL": 21 },
+  "error_floor": 17,
+  "run_id": { "format": "uuid4 as 32 hex characters", "pattern": "^[0-9a-f]{32}$" },
+  "events": {
+    "first_line_of_a_run": "app_start",
+    "on_hide_or_unload": "app_hide",
+    "traps": ["window_error", "unhandled_rejection", "console_error", "console_warn"],
+    "storage": ["storage_unavailable", "log_store_corrupt"]
+  },
+  "behaviour": {
+    "flush_on_error": "a line at or above error_floor is written to the store at once",
+    "ring": "the store holds at most ring_size lines; the oldest go first",
+    "hide_once": "one app_hide per hide, however many events the browser fires",
+    "export": "one JSON object per line (jsonl)"
+  }
+}
