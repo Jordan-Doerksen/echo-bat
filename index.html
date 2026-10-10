@@ -329,6 +329,7 @@ body {
 </script>
 <script src="src/std/save.js"></script>
 <script src="src/save-migrations.js"></script>
+<script src="src/std/tick.js"></script>
 <script>
 (() => {
 'use strict';
@@ -1397,14 +1398,9 @@ function draw() {
 // ==========================================================================
 // LOOP
 // ==========================================================================
-let last = performance.now(), raf = null;
-function frame(now) {
-  const dt = Math.min((now - last) / 1000, 0.05);
-  last = now;
-  update(dt);
-  draw();
-  raf = requestAnimationFrame(frame);
-}
+// GAME-18: one loop owns game time. The clamp (NaN or negative is zero; one capped step after a
+// hidden tab) and the frame request live in src/std/tick.js, never here.
+const tick = GameStd.createTick({ maxStepMs: CFG.tick.maxStepMs, update, draw: () => draw() });
 
 // ==========================================================================
 // INPUT
@@ -1498,10 +1494,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (state === 'playing') pauseGame();
     else Audio.suspend();
-    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    tick.stop();
   } else {
-    last = performance.now();
-    if (!raf) raf = requestAnimationFrame(frame);
+    tick.start(); // a fresh clock: the first step after start is zero time
     if (state !== 'paused' && state !== 'choosing') Audio.resume();
   }
 });
@@ -1538,7 +1533,7 @@ window.__eb = {
 WATCHDOG.mountDevMenu({ target: $('colophon'), taps: CFG.log.devMenuTaps, lines: CFG.log.devMenuLines, exportName: CFG.log.exportName });
 resize();
 toTitle();
-raf = requestAnimationFrame(frame);
+tick.start();
 })();
 </script>
 </body>

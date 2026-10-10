@@ -7,6 +7,6 @@
   "scripts": {
     "build": "node tools/build-config.mjs",
     "gate": "node tools/build-config.mjs --check",
-    "test": "npm run gate && node --test tests/save.test.mjs"
+    "test": "npm run gate && node --test tests/save.test.mjs tests/tick.test.mjs"
   }
 }
