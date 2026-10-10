@@ -44,6 +44,9 @@
     var target = o.target || null;
     var doc = o.doc || (typeof g.document !== 'undefined' ? g.document : null);
     var win = o.win || g;   /* window blur releases everything; injectable for a test with no window */
+    /* Device-layer guard: keyFilter(event, intent) returning false drops the key before it becomes
+       an intent. The one real use: a focused button owns its own Enter and Space. */
+    var keyFilter = typeof o.keyFilter === 'function' ? o.keyFilter : null;
     var bound = [];
 
     function press(intent) { if (!known[intent]) return; if (!held[intent]) edge[intent] += 1; held[intent] = 1; }
@@ -67,7 +70,10 @@
 
       bind: function () {
         if (!doc) return false;
-        var onKeyDown = function (e) { if (api.keyDown(e.code)) e.preventDefault(); };
+        var onKeyDown = function (e) {
+          if (keyFilter && keys[e.code] && keyFilter(e, keys[e.code]) === false) return;
+          if (api.keyDown(e.code)) e.preventDefault();
+        };
         var onKeyUp = function (e) { api.keyUp(e.code); };
         var local = function (e) { var r = target && target.getBoundingClientRect ? target.getBoundingClientRect() : { left: 0, top: 0 }; return { x: e.clientX - r.left, y: e.clientY - r.top }; };
         var onDown = function (e) { var p = local(e); api.pointerDown(p.x, p.y, e.pointerType); };

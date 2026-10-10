@@ -330,6 +330,7 @@ body {
 <script src="src/std/save.js"></script>
 <script src="src/save-migrations.js"></script>
 <script src="src/std/tick.js"></script>
+<script src="src/std/input.js"></script>
 <script>
 (() => {
 'use strict';
@@ -554,9 +555,9 @@ let state = 'title'; // title | playing | choosing | dying | over | paused
 let time = 0;
 
 const bat = { x: 0, y: 0, vx: 0, vy: 0, r: 11, hp: 3, inv: 0, flap: 0, ang: 0, spin: 0, trail: [] };
-const input = { active: false, x: 0, y: 0, id: null };
-const hover = { x: -100, y: -100, seen: false };
-const keys = { up: 0, down: 0, left: 0, right: 0 };
+// GAME-19: intents come from config/game.json; INPUT (built in the INPUT section) is the one map.
+// The rules read INPUT.held, INPUT.pressed() and INPUT.pointer, never a key or a pointer event.
+const hover = { seen: false }; // a mouse moved over the canvas without pressing: the bat follows it
 const TOUCH_OFFSET = () => 74 * S; // the bat rides above your finger
 
 let level = 1, quota = 5, got = 0, score = 0, fruitTotal = 0;
@@ -898,7 +899,8 @@ function settingsGesture() {
 // ==========================================================================
 // UPDATE
 // ==========================================================================
-function update(dt) {
+function update(dt) { handleIntents(); updateGame(dt); INPUT.endStep(); }
+function updateGame(dt) {
   time += dt;
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }
   if (flashT > 0) flashT -= dt;
@@ -929,7 +931,7 @@ function update(dt) {
   if (bat.inv > 0) bat.inv -= dt;
 
   let tx, ty;
-  const kx = keys.right - keys.left, ky = keys.down - keys.up;
+  const kx = INPUT.held.right - INPUT.held.left, ky = INPUT.held.down - INPUT.held.up;
   if (demo) {
     // attract: glide toward the nearest fruit, lazily
     tx = W * 0.5; ty = H * 0.42;
@@ -941,10 +943,10 @@ function update(dt) {
   } else if (kx || ky) {
     const d = Math.hypot(kx, ky);
     tx = bat.x + (kx / d) * 200; ty = bat.y + (ky / d) * 200;
-  } else if (input.active) {
-    tx = input.x; ty = input.y - TOUCH_OFFSET(); // ride above the finger
+  } else if (INPUT.held.fly) {
+    tx = INPUT.pointer.x; ty = INPUT.pointer.y - TOUCH_OFFSET(); // ride above the finger
   } else if (hover.seen) {
-    tx = hover.x; ty = hover.y;
+    tx = INPUT.pointer.x; ty = INPUT.pointer.y;
   }
 
   let ax = 0, ay = 0;
@@ -1407,55 +1409,43 @@ const tick = GameStd.createTick({ maxStepMs: CFG.tick.maxStepMs, update, draw: (
 // ==========================================================================
 function firstGesture() { Audio.init(); Audio.resume(); }
 
-canvas.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  firstGesture();
-  if (input.id !== null) return;
-  input.id = e.pointerId;
-  input.active = true;
-  input.x = e.clientX; input.y = e.clientY;
-  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+// GAME-19: one map from devices to the intents in config/game.json. Keyboard and pointer both end
+// as the same intents; touch arrives as a pointer. The rules read INPUT.held and INPUT.pressed().
+const INPUT = GameStd.createInput({
+  config: CFG.input, target: canvas,
+  // a focused control owns its own activation key, and the settings screen's toggles own theirs
+  keyFilter: (e, intent) => !(intent === 'confirm' && ((e.target && e.target.closest && e.target.closest('button, a')) || !screens.settings.hidden))
 });
-canvas.addEventListener('pointermove', (e) => {
-  if (e.pointerType === 'mouse') { hover.x = e.clientX; hover.y = e.clientY; hover.seen = true; }
-  if (e.pointerId !== input.id) return;
-  input.x = e.clientX; input.y = e.clientY;
-});
-function releasePointer(e) {
-  if (e.pointerId !== input.id) return;
-  input.id = null;
-  input.active = false;
-}
-canvas.addEventListener('pointerup', releasePointer);
-canvas.addEventListener('pointercancel', releasePointer);
+INPUT.bind();
+
+// DEVICE LAYER: the only lines in this file that touch a device event. Pointer capture, the
+// audio-unlock gesture, the mouse-hover flag and the touch-scroll guard. No intent is read here.
+canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); firstGesture(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} });
+canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') hover.seen = true; });
 canvas.addEventListener('pointerout', (e) => { if (!e.relatedTarget && e.pointerType === 'mouse') hover.seen = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('touchmove', (e) => { if (state === 'playing') e.preventDefault(); }, { passive: false });
-addEventListener('blur', () => {
-  input.id = null; input.active = false;
-  keys.up = keys.down = keys.left = keys.right = 0;
-});
+document.addEventListener('keydown', firstGesture);
+// END DEVICE LAYER
 
-const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
-addEventListener('keydown', (e) => {
-  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = 1; firstGesture(); }
-  else if (e.code === 'KeyP' || e.code === 'Escape') {
+// Intents with an edge (pressed once) are handled at the top of every step.
+function handleIntents() {
+  if (INPUT.pressed('pause')) {
     if (!screens.settings.hidden) closeSettings();
     else if (state === 'playing') pauseGame();
     else if (state === 'paused') resumeGame();
   }
-  else if (e.code === 'KeyM') $('btnMute').click();
-  else if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') {
-    if (state === 'choosing') chooseGift(Number(e.code.slice(-1)) - 1);
+  if (INPUT.pressed('mute')) $('btnMute').click();
+  if (state === 'choosing') {
+    if (INPUT.pressed('choose1')) chooseGift(0);
+    else if (INPUT.pressed('choose2')) chooseGift(1);
+    else if (INPUT.pressed('choose3')) chooseGift(2);
   }
-  else if (e.code === 'Enter' || e.code === 'Space') {
-    if (!screens.settings.hidden) return; // settings open: keys belong to the focused toggle, not "start"
-    if (e.target && e.target.closest && e.target.closest('button, a')) return; // a focused control owns its own activation key
-    if (state === 'title' || state === 'over') { firstGesture(); startGame(); }
-    else if (state === 'choosing' && giftSel >= 0) chooseGift(giftSel); // Enter confirms
+  if (INPUT.pressed('confirm')) {
+    if (state === 'title' || state === 'over') startGame();
+    else if (state === 'choosing' && giftSel >= 0) chooseGift(giftSel); // the confirm key picks the selected gift
   }
-});
-addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = 0; });
+}
 
 // ==========================================================================
 // WIRING
@@ -1522,7 +1512,7 @@ window.__eb = {
   get spores() { return spores; }, get owls() { return owls; }, get pulses() { return pulses; },
   get save() { return save; }, get quota() { return quota; }, get got() { return got; },
   get settings() { return settings; },
-  bat, input,
+  bat, input: INPUT,
   start: startGame, choose: chooseGift, advance, end: endRun,
   give: (k) => { if (UPGRADES[k] && upg[k] < UPGRADES[k].max) { upg[k]++; setHud(); } },
   setLevel: (l) => { level = l; genLevel(l); setHud(); },

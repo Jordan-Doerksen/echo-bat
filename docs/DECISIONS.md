@@ -51,3 +51,4 @@ runs from disk, the old save loads, the owner play-tests. The monorepo copy is r
 **Change log.**
 - 2026-10-10: slice 1 built: watchdog first, config twin, the standard save with the version-0 migration, the dev menu on the colophon. Proven live: a seeded unversioned save loaded with best 41, level 7, muted; the next write carried version 1; 3 Node tests; zero errors in the log.
 - 2026-10-10: slice 2 built: the standard tick owns the loop; the game script requests no frame of its own; raw timers remain only inside the Audio object (allow-list). 6 Node tests; the bat still flies the title.
+- 2026-10-10: slice 3 built: intents from config through the standard input; one marked device layer (pointer capture, audio gesture, hover flag, touch guard); edge intents handled at the top of every step. Proven live: Enter starts, arrows steer, P pauses, zero errors. 9 Node tests. Awaiting the owner play-test; the monorepo copy is refreshed after it.
