@@ -15,7 +15,7 @@ function load() {
 }
 const cfg = JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8'));
 const store = () => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
-const make = (w, s, report) => w.GameStd.createSave({ key: cfg.save.key, settingsKey: cfg.save.settingsKey, version: cfg.save.version, store: s, defaults: { best: 0, bestLevel: 0, muted: false, waits: {} }, settingsDefaults: { sfx: true, music: true }, migrations: w.EB_MIGRATIONS, report: report || (() => {}) });
+const make = (w, s, report) => w.GameStd.createSave({ key: cfg.save.key, settingsKey: cfg.save.settingsKey, version: cfg.save.version, store: s, defaults: cfg.save.defaults, settingsDefaults: { sfx: true, music: true }, migrations: w.EB_MIGRATIONS, report: report || (() => {}) });
 
 test('the shipped, unversioned save loads with its best, bestLevel and muted intact', () => {
   const w = load(), s = store();
@@ -48,4 +48,23 @@ test('a NaN best is refused and the last good save stays', () => {
   save.data.best = NaN; assert.equal(save.write(), false);
   assert.equal(JSON.parse(s.getItem('echoBatSave')).best, 12);
   assert.equal(reports.at(-1)[0], 'save_invalid');
+});
+
+// GAME-17 clause 9. A release is reverted, or an older copy is opened: the stored save is newer
+// than this game. It must still be there, byte for byte, when the newer game returns.
+test('an echoBatSave from a newer version is left untouched; the session runs in memory', () => {
+  const w = load(), s = store(), reports = [];
+  const newer = JSON.stringify({ version: cfg.save.version + 1, best: 88, bestLevel: 12, muted: true, relics: ['moth'] });
+  s.setItem('echoBatSave', newer);
+  const save = make(w, s, (e, c) => reports.push([e, JSON.parse(JSON.stringify(c))]));
+  assert.deepEqual(JSON.parse(JSON.stringify(save.newer)), { found: cfg.save.version + 1, expected: cfg.save.version });
+  assert.deepEqual(reports, [['save_newer_version', { key: 'echoBatSave', found: cfg.save.version + 1, expected: cfg.save.version }]]);
+  assert.equal(save.data.best, 0);
+  save.data.best = 5;
+  assert.ok(save.write());
+  save.reset();
+  assert.equal(s.getItem('echoBatSave'), newer);
+  save.settings.sfx = false;
+  assert.ok(save.writeSettings());
+  assert.equal(JSON.parse(s.getItem('echo-bat.settings')).sfx, false);
 });

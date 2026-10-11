@@ -2,6 +2,15 @@
 
 Phase log for echo-bat. Newest first. Absolute dates (YYYY-MM-DD).
 
+## 2026-10-11 — A newer save is left untouched
+- If the stored save is from a newer version of the game, this copy does not read it, write it
+  or remove it. The session runs in memory, and the title says so in one line. The save is still
+  there when the newer copy is opened again.
+- The default save now lives in `config/game.json`. `npm test` fails when its shape changes and
+  the save version does not.
+- The standard-module retrofit of 2026-10-10 (watchdog, save, tick, intents) is recorded in
+  `docs/DECISIONS.md`, decision 0003.
+
 ## 2026-07-14 — Sound settings
 - Settings panel (title + pause): separate Sound-effects and Music toggles,
   persisted under `echo-bat.settings` — the `echoBatSave` key is untouched.

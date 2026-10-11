@@ -9,7 +9,17 @@ window.GAME_CONFIG = {
   "save": {
     "key": "echoBatSave",
     "settingsKey": "echo-bat.settings",
-    "version": 1
+    "version": 1,
+    "defaults": {
+      "best": 0,
+      "bestLevel": 0,
+      "muted": false,
+      "waits": {}
+    },
+    "shape": {
+      "version": 1,
+      "fingerprint": "22e56f29f4784f5c"
+    }
   },
   "log": {
     "key": "echo-bat.log.v1",

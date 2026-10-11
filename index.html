@@ -263,6 +263,7 @@ body {
     <br>
     <button id="btnSettingsT" class="btn-ghost">Sound &amp; settings</button>
     <p class="record-line" id="recordLine" hidden>Best harvest <b id="recordVal">0</b></p>
+    <p class="hint" id="newerNote" hidden>This save is from a newer version. Progress is not kept in this session.</p>
     <button class="colophon" id="colophon" type="button" aria-label="Colophon. Tap five times for the debug log.">N°03 ✦ The Glass Archive ✦ MMXXVI</button>
     <nav class="archive-nav" aria-label="other games in the archive">
       <a href="../star-charter/">N°01 ✦ Star Charter</a>
@@ -375,10 +376,11 @@ const caveName = (l) => CAVES[(l - 1) % CAVES.length];
 const CFG = window.GAME_CONFIG;
 const SAVE = GameStd.createSave({
   key: CFG.save.key, settingsKey: CFG.save.settingsKey, version: CFG.save.version,
-  defaults: { best: 0, bestLevel: 0, muted: false, waits: {} }, settingsDefaults: { sfx: true, music: true },
+  defaults: CFG.save.defaults, settingsDefaults: { sfx: true, music: true }, // the default save is in config so tools/save-shape.mjs can read its shape
   migrations: window.EB_MIGRATIONS, report: WATCHDOG.report
 });
 const save = SAVE.data;
+if (SAVE.newer) $('newerNote').hidden = false; // GAME-17 clause 9: the stored save is from a newer version and is left untouched
 function persist() { if (!SAVE.write()) WATCHDOG.log.write('WARN', 'save_not_written', { best: save.best }); }
 
 // ==========================================================================

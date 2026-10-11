@@ -12,9 +12,11 @@
       report: (event, ctx) => watchdog.warn(event, ctx)        // optional
     });
     save.data.best = 12; save.write();
+    if (save.newer) showTheNewerSaveLine();   // clause 9: progress is not kept in this session
 
   Clauses: 1 version · 2 migration · 3 merge onto defaults · 4 no invalid write · 5 probe ·
-  6 two keys · 7 waits are saved · 8 unreadable save kept as <key>.bad.
+  6 two keys · 7 waits are saved · 8 unreadable save kept as <key>.bad · 9 a save from a newer
+  version is left untouched.
 */
 (function (g) {
   'use strict';
@@ -87,26 +89,36 @@
       } catch (e) { return { raw: raw, obj: null, bad: true }; }
     }
 
-    /* Clauses 1, 2, 3, 8. */
+    /* Clauses 1, 2, 3, 8, 9. */
     function load() {
       var r = readRaw(o.key);
       if (r.bad) {
         try { store.setItem(o.key + '.bad', r.raw); } catch (e) { report('storage_write_failed', { key: o.key + '.bad', reason: String(e) }); }
         report('save_unreadable', { key: o.key, kept_as: o.key + '.bad' });
-        return { data: merge(defaults, {}), fresh: true, migratedFrom: null };
+        return { data: merge(defaults, {}), fresh: true, migratedFrom: null, newer: null };
       }
       var obj = r.obj || {};
       var from = typeof obj.version === 'number' && isFinite(obj.version) ? Math.floor(obj.version) : 0;
+      /* Clause 9: a save from a newer game gets no migration step and no merge. This game cannot
+         know what the newer fields mean, and a merge drops every field it has never seen. */
+      if (from > version) {
+        report('save_newer_version', { key: o.key, found: from, expected: version });
+        return { data: merge(defaults, {}), fresh: true, migratedFrom: null, newer: { found: from, expected: version } };
+      }
       var cur = obj;
       for (var v = from; v < version; v++) {
         var step = migrations[v];
         if (typeof step !== 'function') { report('save_migration_missing', { from: v, to: version }); break; }
         cur = step(cur, store) || cur;
       }
-      return { data: merge(defaults, cur), fresh: r.obj === null, migratedFrom: r.obj === null ? null : from };
+      return { data: merge(defaults, cur), fresh: r.obj === null, migratedFrom: r.obj === null ? null : from, newer: null };
     }
 
     var loaded = load();
+    /* Clause 9: in a newer-save session the save key is never written and never removed. The save
+       calls go to a memory store, so the stored text is still there when the newer game returns.
+       The settings keep the real store: they have their own key and no version (clause 6). */
+    var saveStore = loaded.newer ? memoryStore() : store;
     var settingsRaw = readRaw(o.settingsKey);
     if (settingsRaw.bad) report('settings_unreadable', { key: o.settingsKey });
 
@@ -114,6 +126,7 @@
       available: available,
       fresh: loaded.fresh,
       migratedFrom: loaded.migratedFrom,
+      newer: loaded.newer,   /* null, or { found, expected }: show the newer-save line (clause 9) */
       version: version,
       data: loaded.data,
       settings: merge(settingsDefaults, settingsRaw.obj || {}),
@@ -124,7 +137,7 @@
         if (bad) { report('save_invalid', { path: bad }); return false; }
         var out = merge(defaults, api.data);
         out.version = version;
-        try { store.setItem(o.key, JSON.stringify(out)); return true; }
+        try { saveStore.setItem(o.key, JSON.stringify(out)); return true; }
         catch (e) { report('storage_write_failed', { key: o.key, reason: String(e) }); return false; }
       },
       writeSettings: function () {
@@ -136,7 +149,7 @@
       /* Clause 6: a reset of the save does not touch the settings. */
       reset: function () {
         api.data = merge(defaults, {});
-        try { store.removeItem(o.key); } catch (e) { report('storage_write_failed', { key: o.key, reason: String(e) }); }
+        try { saveStore.removeItem(o.key); } catch (e) { report('storage_write_failed', { key: o.key, reason: String(e) }); }
       },
 
       /* Clause 7: a wait the player could sit out is an absolute time in the save, so a reload keeps it. */

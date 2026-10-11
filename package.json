@@ -6,7 +6,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "build": "node tools/build-config.mjs",
-    "gate": "node tools/build-config.mjs --check",
-    "test": "npm run gate && node --test tests/save.test.mjs tests/tick.test.mjs tests/input.test.mjs"
+    "gate": "node tools/build-config.mjs --check && node tools/save-shape.mjs --check",
+    "test": "npm run gate && node --test tests/save.test.mjs tests/tick.test.mjs tests/input.test.mjs tests/save-shape.test.mjs"
   }
 }

@@ -1,7 +1,11 @@
 {
   "_rule": "Keys, caps and the intent map (game-systems law). config/game.js is GENERATED from this file by tools/build-config.mjs; npm test fails when they differ. The key names are the ones the shipped game used, so no save is lost.",
   "meta": { "name": "Echo Bat", "slug": "echo-bat", "version": "1.1.0" },
-  "save": { "key": "echoBatSave", "settingsKey": "echo-bat.settings", "version": 1 },
+  "save": {
+    "key": "echoBatSave", "settingsKey": "echo-bat.settings", "version": 1,
+    "defaults": { "best": 0, "bestLevel": 0, "muted": false, "waits": {} },
+    "shape": { "version": 1, "fingerprint": "22e56f29f4784f5c" }
+  },
   "log": { "key": "echo-bat.log.v1", "ringSize": 500, "flushMs": 2000, "devMenuTaps": 5, "devMenuLines": 60, "exportName": "echo-bat-log-{run_id}.jsonl" },
   "tick": { "maxStepMs": 50, "rawTimers": [] },
   "input": {
